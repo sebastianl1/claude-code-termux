@@ -56,6 +56,13 @@ int main(int argc, char **argv) {
     }
     setenv("DISABLE_AUTOUPDATER", "1", 1);
 
+    /* termux-exec inyecta libtermux-exec-ld-preload.so (Bionic) via LD_PRELOAD
+     * en shells interactivos. El loader glibc intenta precargarla y falla:
+     * 'libc.so.6: version `LIBC' not found'. El binario glibc de Claude Code
+     * no la necesita; limpiar las variables del loader evita el choque. */
+    unsetenv("LD_PRELOAD");
+    unsetenv("LD_LIBRARY_PATH");
+
     args = calloc((size_t)argc + 4, sizeof(char *));
     if (!args) {
         perror("claude: calloc");
