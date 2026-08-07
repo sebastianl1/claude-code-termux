@@ -14,6 +14,14 @@
  *   - CLAUDE_CODE_EXECPATH     -> este launcher, para que los subprocesos
  *                                 (grep/find/rg y herramientas embebidas)
  *                                 vuelvan a re-ejecutarse a traves de el.
+ *
+ * El directorio GLIBC_OVR (PREFIX/share/claude/glibc) contiene symlinks de
+ * las librerias glibc sin version (.so) apuntando a sus ELF reales (.so.N).
+ * Termux instala libc.so (y otras) como scripts GNU ld (texto), que el
+ * cargador dinamico no puede ejecutar; el runtime Bun de Claude Code los
+ * pide por nombre en tiempo de ejecucion (dlopen), causando
+ * 'invalid ELF header'. Poner GLIBC_OVR primero en --library-path resuelve
+ * esas peticiones al ELF real.
  */
 
 #ifndef PREFIX
@@ -26,6 +34,7 @@
 
 #define GLIBC_LOADER PREFIX "/glibc/lib/ld-linux-aarch64.so.1"
 #define GLIBC_LIB    PREFIX "/glibc/lib"
+#define GLIBC_OVR    PREFIX "/share/claude/glibc"
 #define CLAUDE_REAL  PREFIX "/share/claude/claude.real"
 #define CLAUDE_BIN   PREFIX "/bin/claude"
 #define SSL_CERTS    PREFIX "/etc/tls/cert.pem"
@@ -55,7 +64,7 @@ int main(int argc, char **argv) {
 
     args[0] = GLIBC_LOADER;
     args[1] = "--library-path";
-    args[2] = GLIBC_LIB;
+    args[2] = GLIBC_OVR ":" GLIBC_LIB;
     args[3] = CLAUDE_REAL;
     for (i = 1; i < argc; i++) {
         args[i + 3] = argv[i];

@@ -34,6 +34,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_BIN_DIR="$PREFIX/bin"
 CLAUDE_SHARE_DIR="$PREFIX/share/claude"
 CLAUDE_REAL="$CLAUDE_SHARE_DIR/claude.real"
+GLIBC_PREFIX="$PREFIX/glibc"
 CLAUDE_CONFIG_DIR="$HOME/.claude"
 CLAUDE_SETTINGS_FILE="$CLAUDE_CONFIG_DIR/settings.json"
 BACKUP_DIR="$HOME/backups/claude"
@@ -417,6 +418,26 @@ install_launcher() {
     chmod 755 "$CLAUDE_BIN_DIR/claude"
 }
 
+setup_glibc_override() {
+    local ovr="$CLAUDE_SHARE_DIR/glibc"
+    mkdir -p "$ovr"
+    local lib elf_base count=0
+    for lib in "$GLIBC_PREFIX"/lib/lib*.so.*; do
+        [ -e "$lib" ] || continue
+        if [ "$(head -c 4 "$lib" 2>/dev/null | od -An -tx1 | tr -d ' \n')" != "7f454c46" ]; then
+            continue
+        fi
+        elf_base=$(basename "$lib")
+        elf_base=${elf_base%%.so.*}.so
+        if [ ! -e "$ovr/$elf_base" ]; then
+            ln -sfn "$lib" "$ovr/$elf_base"
+            count=$((count + 1))
+        fi
+    done
+    ln -sfn "$GLIBC_PREFIX/lib/ld-linux-aarch64.so.1" "$ovr/ld-linux-aarch64.so.1" 2>/dev/null || true
+    check_item "Symlinks glibc (override)" "ok" "$count enlaces"
+}
+
 configure_claude_settings() {
     section_header "Configuracion"
 
@@ -497,6 +518,7 @@ install_claude() {
     ensure_glibc_layer
     fetch_claude_binary
     install_launcher
+    setup_glibc_override
     configure_claude_settings
 }
 
