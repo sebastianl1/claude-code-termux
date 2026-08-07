@@ -1,0 +1,8 @@
+{
+  "version": "2.1.224",
+  "sha256": "139305750e86a4336a6d90dcdb680baccc88aeb83ccd77a935b046a62362e380",
+  "urls": [
+    "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.224.tgz",
+    "https://github.com/sebastianl1/claude-code-termux/releases/download/claude-2.1.224/claude-code-linux-arm64.tar.gz"
+  ]
+}
