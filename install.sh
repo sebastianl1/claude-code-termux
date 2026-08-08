@@ -2,7 +2,7 @@
 #
 # Claude Code — Termux
 # Script de instalacion para Termux
-# v1.0.0
+# v1.0.1
 #
 # Script creado por Sebastian Laguna
 # https://github.com/sebastianl1/claude-code-termux
@@ -25,7 +25,7 @@ set -eEuo pipefail
 
 # ── Configuracion ────────────────────────────────────────────────────────────
 
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.0.1"
 SCRIPT_AUTHOR="Sebastian Laguna"
 SCRIPT_REPO="https://github.com/sebastianl1/claude-code-termux"
 
@@ -287,17 +287,42 @@ check_environment() {
 
 check_dependencies() {
     local missing=()
+    local still=()
     local c
+    local pkgs=""
 
-    for c in curl tar pkg file; do
+    for c in curl tar file; do
         command -v "$c" &>/dev/null || missing+=("$c")
     done
     if ! command -v cc &>/dev/null && ! command -v clang &>/dev/null; then
-        missing+=("cc/clang")
+        missing+=("clang")
     fi
 
     if [ "${#missing[@]}" -gt 0 ]; then
-        print_error "Faltan herramientas requeridas: ${missing[*]}. Ejecuta: pkg install -y curl tar clang file"
+        for c in "${missing[@]}"; do
+            pkgs="$pkgs $c"
+        done
+        echo -e "  ${YELLOW}⬡${RESET} Faltan herramientas: ${missing[*]}"
+        if ! command -v pkg &>/dev/null; then
+            print_error "Falta 'pkg' para instalarlas. Ejecuta: pkg install -y$pkgs"
+        fi
+        if ! run_hidden "Instalar dependencias" pkg install -y$pkgs; then
+            run_hidden "Actualizar repositorios" pkg update -y || true
+            run_hidden "Instalar dependencias" pkg install -y$pkgs || {
+                show_log_tail
+                print_error "No se pudieron instalar las herramientas. Ejecuta: pkg update && pkg install -y$pkgs"
+            }
+        fi
+
+        for c in curl tar file; do
+            command -v "$c" &>/dev/null || still+=("$c")
+        done
+        if ! command -v cc &>/dev/null && ! command -v clang &>/dev/null; then
+            still+=("clang")
+        fi
+        if [ "${#still[@]}" -gt 0 ]; then
+            print_error "Aun faltan herramientas: ${still[*]}. Ejecuta: pkg update && pkg install -y$pkgs"
+        fi
     fi
 
     check_item "Dependencias requeridas" "ok" "curl tar pkg clang file"
@@ -370,7 +395,7 @@ ensure_glibc_layer() {
         }
     fi
 
-    run_hidden "Instalar capa glibc" pkg install -y glibc ca-certificates ca-certificates-glibc clang curl tar || {
+    run_hidden "Instalar capa glibc" pkg install -y glibc ca-certificates ca-certificates-glibc clang curl tar file || {
         show_log_tail
         print_error "No se pudo instalar la capa glibc de Termux (glibc)."
     }
@@ -713,6 +738,8 @@ show_help() {
     echo -e "  ${DIM}  - Fuentes: vendor oficial (npm), espejo propio, cache"
     echo -e "  ${DIM}  - Nativo en Termux (sin proot, sin VMs)"
     echo -e "  ${DIM}  - Sin dependencias npm"
+    echo -e "  ${DIM}  - Instala automaticamente las herramientas necesarias"
+    echo -e "  ${DIM}    (curl, tar, file, clang) via pkg"
     echo -e "  ${DIM}  - Actualizar: re-ejecutar install.sh${RESET}"
     echo ""
     echo -e "  ${BOLD}Script creado por Sebastian Laguna${RESET}"

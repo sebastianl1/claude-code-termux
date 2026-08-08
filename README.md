@@ -45,13 +45,14 @@ Abre Termux y ejecuta:
 pkg update && pkg upgrade -y
 ```
 
-### 3. Instala las herramientas básicas
-
-Git, curl y tar son necesarios para descargar e instalar Claude Code:
+### 3. Instala Git (para clonar el instalador)
 
 ```bash
-pkg install git curl tar -y
+pkg install git -y
 ```
+
+El instalador (`install.sh`) instala automáticamente `curl`, `tar`, `file` y
+`clang` si no están presentes, así que no hace falta instalarlos a mano.
 
 ### 4. Verifica tu arquitectura
 
@@ -83,9 +84,13 @@ Con Termux actualizado y git instalado, continúa con la sección de
 - **Termux** instalado desde [F-Droid](https://f-droid.org/packages/com.termux/)
   (no desde Google Play)
 - **Dispositivo Android ARM64** (aarch64)
-- **Git, curl y tar** instalados (`pkg install git curl tar -y`)
+- **Git** para clonar el repositorio (`pkg install git -y`) o descargar el ZIP
 - **Conexion a internet** para descargar los binarios (~290MB) y la capa glibc
 - Espacio libre: ~450MB
+
+> **Nota:** el instalador instala automáticamente las herramientas necesarias
+> (`curl`, `tar`, `file`, `clang`) con `pkg` si no están presentes. No hace
+> falta instalarlas a mano.
 
 ---
 
@@ -96,13 +101,13 @@ Con Termux actualizado y git instalado, continúa con la sección de
 ```bash
 # 1. Actualizar e instalar dependencias
 pkg update && pkg upgrade -y
-pkg install git curl tar -y
+pkg install git -y   # solo para clonar; el instalador instala lo demas
 
 # 2. Clonar el repositorio
 git clone https://github.com/sebastianl1/claude-code-termux.git
 cd claude-code-termux
 
-# 3. Ejecutar el instalador
+# 3. Ejecutar el instalador (instala automaticamente lo que falte)
 bash install.sh
 ```
 
