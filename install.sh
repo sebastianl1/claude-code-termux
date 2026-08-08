@@ -512,6 +512,69 @@ setup_glibc_override() {
     check_item "Symlinks glibc (override)" "ok" "$count enlaces"
 }
 
+configure_dns() {
+    local resolv_conf="$PREFIX/etc/resolv.conf"
+    local gai_conf="$GLIBC_PREFIX/etc/gai.conf"
+
+    section_header "DNS"
+
+    if [ -w "$resolv_conf" ]; then
+        cat > "$resolv_conf" <<'EOF'
+nameserver 1.1.1.1
+nameserver 9.9.9.9
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+nameserver 208.67.222.222
+options timeout:1 attempts:2 rotate
+EOF
+        check_item "Resolvers DNS (multi-servidor)" "ok" "1.1.1.1, 9.9.9.9, 8.8.8.8..."
+    else
+        check_item "Resolvers DNS (multi-servidor)" "skip" "no escribible: $resolv_conf"
+    fi
+
+    if [ -w "$gai_conf" ]; then
+        if ! grep -q '^precedence ::ffff:0:0/96  100' "$gai_conf"; then
+            cp "$gai_conf" "$gai_conf.bak.claude" 2>/dev/null || true
+            printf '\n# Claude Code: prefer IPv4 (dispositivos sin ruta IPv6)\nprecedence ::ffff:0:0/96  100\n' >> "$gai_conf"
+        fi
+        check_item "Preferencia IPv4 (gai.conf)" "ok" ""
+    else
+        check_item "Preferencia IPv4 (gai.conf)" "skip" "no escribible: $gai_conf"
+    fi
+}
+
+verify_dns() {
+    section_header "Verificacion DNS"
+
+    local host="platform.claude.com"
+    local getent_bin="$GLIBC_PREFIX/bin/getent"
+    local ok=false
+
+    if [ -x "$getent_bin" ]; then
+        if "$getent_bin" ahosts "$host" >/dev/null 2>&1; then
+            check_item "Resolver $host" "ok" ""
+            ok=true
+        fi
+    fi
+
+    if [ "$ok" = "true" ]; then
+        return 0
+    fi
+
+    check_item "Resolver $host" "skip" "no resuelto"
+    echo ""
+    echo -e "  ${YELLOW}⬡${RESET} ${BOLD}Advertencia:${RESET} no se pudo resolver ${host}."
+    echo -e "  ${DIM}Claude Code usa DNS para autenticarse (OAuth). Si el login falla con${RESET}"
+    echo -e "  ${DIM}${RESET}'OAuth error: getaddrinfo ETIMEOUT platform.claude.com' es un"
+    echo -e "  ${DIM}timeout del resolver de red. Verifica:${RESET}"
+    echo -e "  ${DIM}1.${RESET} Conexion a internet (el DNS debe responder)"
+    echo -e "  ${DIM}2.${RESET} Que $PREFIX/etc/resolv.conf tenga nameservers validos:"
+    echo -e "     ${RESET}cat $PREFIX/etc/resolv.conf"
+    echo -e "  ${DIM}3.${RESET} Cambiar de red o usar VPN si tu ISP bloquea DNS externos"
+    echo ""
+    return 1
+}
+
 configure_claude_settings() {
     section_header "Configuracion"
 
@@ -593,6 +656,7 @@ install_claude() {
     fetch_claude_binary
     install_launcher
     setup_glibc_override
+    configure_dns
     configure_claude_settings
 }
 
@@ -603,6 +667,7 @@ verify_installation() {
     else
         print_error "La verificacion de Claude Code fallo. Revisa la instalacion."
     fi
+    verify_dns || true
 }
 
 # ── Resumen final ────────────────────────────────────────────────────────────

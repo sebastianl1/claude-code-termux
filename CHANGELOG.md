@@ -6,6 +6,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `install.sh`: configuracion DNS robusta (`resolv.conf` multi-servidor con
+  `options timeout:1 attempts:2 rotate`), preferencia IPv4 en `gai.conf` y
+  verificacion DNS post-instalacion. Mitiga el error de OAuth
+  `getaddrinfo ETIMEOUT platform.claude.com`.
+- `README.md`: seccion de solucion de problemas para el error OAuth
+  `getaddrinfo ETIMEOUT platform.claude.com`.
+- Tests: validacion del `resolv.conf` generado por el instalador.
 - CI/CD: workflow de lint (bash -n, shellcheck, node --check lang, validacion
   de versions.json, i18n y descargas https) y job de tests (pytest).
 - CD: workflow de despliegue de GitHub Pages (docs/).

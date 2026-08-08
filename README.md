@@ -195,6 +195,56 @@ claude
 
 ---
 
+## Solucion de problemas
+
+### Error: `OAuth error: getaddrinfo ETIMEOUT platform.claude.com`
+
+Este error aparece al iniciar sesion (OAuth o API key) y significa que el
+**resolver DNS no respondio a tiempo** durante la peticion de autenticacion.
+No es un fallo del instalador: la instalacion, el launcher y el binario
+funcionan; es un problema del DNS de la red en el momento del login.
+
+Causas mas comunes:
+
+1. **La red bloquea o no responde a los nameservers configurados** (p. ej.
+   ISPs, redes corporativas o cautivas que filtran DNS externos, VPNs).
+2. **Falta ruta IPv6** en el dispositivo: el runtime puede intentar conectar
+   por IPv6 y quedarse colgado hasta el timeout.
+3. Intermitencia de DNS (picos de latencia o caidas del operador).
+
+El instalador ya configura DNS de forma robusta:
+`$PREFIX/etc/resolv.conf` con multiples servidores
+(`1.1.1.1`, `9.9.9.9`, `8.8.8.8`, `8.8.4.4`, `208.67.222.222`) y
+`options timeout:1 attempts:2 rotate` para que un servidor lento no cuelgue
+la resolucion, y preferencia IPv4 en `gai.conf`.
+
+Si aun asi ves el error, diagnostica:
+
+```bash
+# 1. Verifica que el DNS este bien configurado
+cat $PREFIX/etc/resolv.conf
+
+# 2. Prueba resolver el host con la capa glibc (la que usa Claude Code)
+$PREFIX/glibc/bin/getent ahosts platform.claude.com
+
+# 3. Prueba conexion real
+curl -sI --max-time 10 https://platform.claude.com
+```
+
+Soluciones:
+
+- Cambia de red (WiFi <-> datos moviles) o reinicia el router.
+- Usa una VPN si tu ISP bloquea DNS externos.
+- Reintenta el login pasados unos minutos (intermitencia).
+- Como ultimo recurso, reinicia el dispositivo para renovar la configuracion
+  de red de Android.
+
+> Nota: `curl` y el resto de herramientas nativas usan el DNS de Android
+> (Bionic), por eso pueden funcionar mientras Claude Code falla: el binario
+> de Claude Code usa la capa glibc, que lee `$PREFIX/etc/resolv.conf`.
+
+---
+
 ## Etiquetas y palabras clave
 
 Proyecto orientado a: **Termux**, **Android**, **Claude Code**, **Anthropic**,
