@@ -6,13 +6,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `launcher.c` y `install.sh`: apertura automatica del navegador en el login
+  OAuth. El wrapper `$PREFIX/share/claude/bin/xdg-open` llama a `am start`
+  (mecanica de `termux-open-url`) en lugar del broadcast del `xdg-open` de
+  Termux, que no levanta el navegador desde el binario glibc. El launcher
+  configura `BROWSER=termux-open-url` y pone el wrapper primero en el PATH.
 - `install.sh`: configuracion DNS robusta (`resolv.conf` multi-servidor con
   `options timeout:1 attempts:2 rotate`), preferencia IPv4 en `gai.conf` y
   verificacion DNS post-instalacion. Mitiga el error de OAuth
   `getaddrinfo ETIMEOUT platform.claude.com`.
 - `README.md`: seccion de solucion de problemas para el error OAuth
-  `getaddrinfo ETIMEOUT platform.claude.com`.
-- Tests: validacion del `resolv.conf` generado por el instalador.
+  `getaddrinfo ETIMEOUT platform.claude.com` y para el navegador que no se
+  abre en el login.
+- Tests: validacion del `resolv.conf` generado y del wrapper de navegador.
 - CI/CD: workflow de lint (bash -n, shellcheck, node --check lang, validacion
   de versions.json, i18n y descargas https) y job de tests (pytest).
 - CD: workflow de despliegue de GitHub Pages (docs/).

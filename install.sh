@@ -489,6 +489,39 @@ install_launcher() {
     chmod 755 "$CLAUDE_BIN_DIR/claude"
 }
 
+setup_browser() {
+    local ovr="$CLAUDE_SHARE_DIR/bin"
+    local xdg_open="$ovr/xdg-open"
+    local open_url="$PREFIX/bin/termux-open-url"
+
+    mkdir -p "$ovr"
+
+    # El runtime Bun de Claude Code abre el navegador con 'xdg-open' o
+    # respetando $BROWSER. En Termux, xdg-open -> termux-open usa
+    # 'am broadcast' al receiver de Termux, que desde el proceso glibc no
+    # levanta el navegador. Instalamos un wrapper que llama a 'am start'
+    # (la mecanica de termux-open-url) para abrirlo de verdad. El launcher
+    # lo coloca primero en PATH y configura BROWSER.
+    cat > "$xdg_open" <<'EOF'
+#!/data/data/com.termux/files/usr/bin/sh
+# xdg-open para Claude Code (Termux): abre una URL con am start
+# (misma mecanica que termux-open-url). El launcher pone este directorio
+# primero en PATH para interceptar al xdg-open del sistema.
+[ "$#" -ge 1 ] || exit 1
+url="$1"
+case "${TERMUX__USER_ID:-}" in ''|*[!0-9]*|0[0-9]*) TERMUX__USER_ID=0;; esac
+am start --user "$TERMUX__USER_ID" -a android.intent.action.VIEW -d "$url" > /dev/null 2>&1
+exit 0
+EOF
+    chmod 755 "$xdg_open"
+
+    if [ -x "$open_url" ]; then
+        check_item "Navegador automatico (am start)" "ok" ""
+    else
+        check_item "Navegador automatico (am start)" "skip" "falta $open_url (termux-tools)"
+    fi
+}
+
 setup_glibc_override() {
     local ovr="$CLAUDE_SHARE_DIR/glibc"
     mkdir -p "$ovr"
@@ -655,6 +688,7 @@ install_claude() {
     ensure_glibc_layer
     fetch_claude_binary
     install_launcher
+    setup_browser
     setup_glibc_override
     configure_dns
     configure_claude_settings

@@ -245,6 +245,29 @@ Soluciones:
 
 ---
 
+### El navegador no se abre al iniciar sesion (OAuth)
+
+Al elegir una opcion de login (por ejemplo "Anthropic Console"), Claude Code
+intenta abrir el navegador automaticamente para completar la autenticacion.
+
+En Termux, el `xdg-open` del sistema usa `am broadcast` y no siempre levanta
+el navegador desde el binario glibc de Claude Code. El instalador resuelve
+esto automaticamente:
+
+- Instala `$PREFIX/share/claude/bin/xdg-open`, un wrapper que llama a
+  `am start` (la misma mecanica que `termux-open-url`) y abre el navegador
+  Android de verdad.
+- El launcher configura `BROWSER=termux-open-url` y pone ese wrapper primero
+  en el `PATH`, asi Claude Code lo usa tanto si respeta `$BROWSER` como si
+  invoca `xdg-open` directamente.
+
+Si aun asi no se abre, pega la URL manualmente en el navegador. Ten en
+cuenta que el codigo de verificacion que muestra la pagina **expira en
+aproximadamente 1 minuto**, asi que copialo y pegalo en Termux de inmediato,
+sin cerrar `claude`.
+
+---
+
 ## Etiquetas y palabras clave
 
 Proyecto orientado a: **Termux**, **Android**, **Claude Code**, **Anthropic**,

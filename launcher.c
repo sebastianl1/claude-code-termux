@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #define GLIBC_LOADER PREFIX "/glibc/lib/ld-linux-aarch64.so.1"
@@ -37,6 +38,8 @@
 #define GLIBC_OVR    PREFIX "/share/claude/glibc"
 #define CLAUDE_REAL  PREFIX "/share/claude/claude.real"
 #define CLAUDE_BIN   PREFIX "/bin/claude"
+#define CLAUDE_OVR   PREFIX "/share/claude/bin"
+#define TERMUX_OPEN  PREFIX "/bin/termux-open-url"
 #define SSL_CERTS    PREFIX "/etc/tls/cert.pem"
 #define TMP_DIR      PREFIX "/tmp"
 
@@ -55,6 +58,39 @@ int main(int argc, char **argv) {
         setenv("CLAUDE_CODE_EXECPATH", CLAUDE_BIN, 1);
     }
     setenv("DISABLE_AUTOUPDATER", "1", 1);
+
+    /* Claude Code (runtime Bun) abre el navegador para el login OAuth con
+     * Bun.spawn(["xdg-open", url]). En Termux, el xdg-open del sistema es un
+     * symlink a termux-open que usa 'am broadcast' al receiver de Termux, y
+     * desde el proceso glibc no levanta el navegador de forma fiable.
+     *
+     * El instalador crea PREFIX/share/claude/bin/xdg-open, un wrapper que
+     * llama a 'am start' (misma mecanica que termux-open-url) y abre el
+     * navegador Android de verdad. Se configura:
+     *   - BROWSER -> termux-open-url (el binario respeta $BROWSER)
+     *   - CLAUDE_OVR primero en PATH  (por si usa 'xdg-open' hardcodeado)
+     */
+    if (access(TERMUX_OPEN, X_OK) == 0) {
+        setenv("BROWSER", TERMUX_OPEN, 1);
+    }
+    {
+        const char *old_path = getenv("PATH");
+        char *new_path = NULL;
+        size_t n = strlen(CLAUDE_OVR) + 1;
+        if (old_path) {
+            n += strlen(old_path) + 1;
+        }
+        new_path = malloc(n);
+        if (new_path) {
+            if (old_path) {
+                snprintf(new_path, n, "%s:%s", CLAUDE_OVR, old_path);
+            } else {
+                snprintf(new_path, n, "%s", CLAUDE_OVR);
+            }
+            setenv("PATH", new_path, 1);
+            free(new_path);
+        }
+    }
 
     /* termux-exec inyecta libtermux-exec-ld-preload.so (Bionic) via LD_PRELOAD
      * en shells interactivos. El loader glibc intenta precargarla y falla:

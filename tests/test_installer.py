@@ -60,3 +60,26 @@ def test_dns_verification_uses_getent_glibc():
     assert "getent" in src and "platform.claude.com" in src, (
         "install.sh debe verificar DNS resolviendo platform.claude.com con getent glibc"
     )
+
+
+def _browser_wrapper(src):
+    m = re.search(
+        r'cat > "\$xdg_open" <<\'EOF\'\n(.*?)\nEOF',
+        src,
+        re.S,
+    )
+    assert m, "install.sh debe crear el wrapper xdg-open con heredoc"
+    return m.group(1)
+
+
+def test_browser_wrapper_uses_am_start():
+    wrapper = _browser_wrapper((ROOT / "install.sh").read_text())
+    assert "am start" in wrapper, "el wrapper xdg-open debe usar am start"
+    assert "android.intent.action.VIEW" in wrapper, "el wrapper debe abrir con intent VIEW"
+
+
+def test_launcher_configures_browser():
+    src = (ROOT / "launcher.c").read_text()
+    assert 'setenv("BROWSER"' in src, "el launcher debe configurar BROWSER"
+    assert "termux-open-url" in src, "el launcher debe apuntar BROWSER a termux-open-url"
+    assert 'setenv("PATH"' in src, "el launcher debe ajustar PATH para el wrapper xdg-open"
