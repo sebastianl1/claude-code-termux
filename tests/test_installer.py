@@ -17,8 +17,8 @@ def test_no_http_plain_downloads():
 
 def test_curl_use_proto_https():
     src = (ROOT / "install.sh").read_text()
-    curl_lines = [ln for ln in src.splitlines() if "curl" in ln]
+    # Solo lineas donde 'curl' es un comando con flags, no menciones en mensajes
+    curl_lines = [ln for ln in src.splitlines() if re.search(r"curl\s+-[A-Za-z]", ln)]
     assert curl_lines, "debe haber descargas con curl"
     without_proto = [ln for ln in curl_lines if "--proto" not in ln]
-    # Los curl de metadatos (registry npm) pueden no tener --proto; aceptar
-    assert len(without_proto) <= 2, f"curl sin --proto =https: {without_proto}"
+    assert not without_proto, f"curl sin --proto =https: {without_proto}"

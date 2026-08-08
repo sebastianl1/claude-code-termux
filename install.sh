@@ -202,7 +202,7 @@ explain_termux_failure() {
     log_content=$(cat "$LOG_FILE" 2>/dev/null || true)
 
     case "$log_content" in
-        *"unable to locate package"*|*"E: Unable"*|*"Failed to fetch"*|*"Could not resolve"*|*"curl"*|*"unexpected e_type"*|*"required file not found"*|*"Binary not found"*)
+        *"unable to locate package"*|*"E: Unable"*|*"Failed to fetch"*|*"Could not resolve"*|*"curl"*|*"unexpected e_type"*|*"required file not found"*|*"Binary not found"*|*"dpkg was interrupted"*)
             echo ""
             echo -e "  ${YELLOW}⬡${RESET} ${BOLD}Instalacion nativa de Claude Code en Termux${RESET}"
             echo -e "  ${DIM}Claude Code se instala con el binario oficial glibc + un${RESET}"
@@ -286,7 +286,26 @@ check_environment() {
 }
 
 check_dependencies() {
-    :
+    local missing=()
+    local c
+
+    for c in curl tar pkg file; do
+        command -v "$c" &>/dev/null || missing+=("$c")
+    done
+    if ! command -v cc &>/dev/null && ! command -v clang &>/dev/null; then
+        missing+=("cc/clang")
+    fi
+
+    if [ "${#missing[@]}" -gt 0 ]; then
+        print_error "Faltan herramientas requeridas: ${missing[*]}. Ejecuta: pkg install -y curl tar clang file"
+    fi
+
+    check_item "Dependencias requeridas" "ok" "curl tar pkg clang file"
+    if command -v python3 &>/dev/null; then
+        check_item "python3 (opcional)" "ok" "$(python3 --version 2>/dev/null)"
+    else
+        check_item "python3 (opcional)" "skip" "no requerido"
+    fi
 }
 
 check_existing() {
@@ -319,9 +338,9 @@ backup_existing() {
 
 restore_backup() {
     local backup_path
-    backup_path=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name 'claude.backup.*' -print -quit 2>/dev/null || true)
+    backup_path=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name 'claude.backup.*' -print 2>/dev/null | sort -r | head -1 || true)
     if [ -n "$backup_path" ] && [ -d "$backup_path" ]; then
-        cp -r "$backup_path"/* "$CLAUDE_CONFIG_DIR/" 2>/dev/null || true
+        cp -a "$backup_path"/. "$CLAUDE_CONFIG_DIR/" 2>/dev/null || true
         {
             echo "--- [restore_backup] $(date) ---"
             echo "Configuracion restaurada desde $backup_path"
@@ -331,6 +350,11 @@ restore_backup() {
 }
 
 ensure_glibc_layer() {
+    run_hidden "Recuperar dpkg interrumpido" dpkg --configure -a || {
+        show_log_tail
+        print_error "No se pudo recuperar dpkg. Ejecuta manualmente: dpkg --configure -a"
+    }
+
     if [ ! -f "$PREFIX/etc/apt/sources.list.d/glibc.list" ]; then
         run_hidden "Actualizar repositorios" pkg update -y || {
             show_log_tail
@@ -368,6 +392,18 @@ save_to_cache() {
     mkdir -p "$CACHE_DIR"
     cp "$src" "$CACHE_DIR/claude" 2>/dev/null || true
     chmod 755 "$CACHE_DIR/claude" 2>/dev/null || true
+    sha256sum "$CACHE_DIR/claude" 2>/dev/null | awk '{print $1}' > "$CACHE_DIR/sha256" 2>/dev/null || true
+}
+
+cache_is_valid() {
+    [ -f "$CACHE_DIR/claude" ] || return 1
+    if [ -f "$CACHE_DIR/sha256" ]; then
+        local expected actual
+        expected=$(cat "$CACHE_DIR/sha256" 2>/dev/null)
+        actual=$(sha256sum "$CACHE_DIR/claude" | awk '{print $1}')
+        [ -n "$expected" ] && [ "$expected" = "$actual" ] || return 1
+    fi
+    verify_binary "$CACHE_DIR/claude"
 }
 
 install_binary() {
@@ -381,14 +417,24 @@ install_binary() {
 }
 
 fetch_binary_from_npm() {
-    local meta tarball archive
+    local meta tarball integrity archive expected actual
 
     meta=$(curl -fsSL --proto =https --connect-timeout 20 --max-time 60 "https://registry.npmjs.org/${NPM_SCOPE}/${NPM_PKG}/latest") || return 1
     tarball=$(printf '%s' "$meta" | grep -o '"tarball":"[^"]*"' | cut -d'"' -f4) || return 1
+    integrity=$(printf '%s' "$meta" | grep -o '"integrity":"sha512-[^"]*"' | cut -d'"' -f4) || true
     [ -n "$tarball" ] || return 1
 
     archive="$TMP_DIR/claude-code-linux-arm64.tgz"
     curl -fsSL --proto =https --retry 2 --connect-timeout 20 --max-time 1200 -o "$archive" "$tarball" || return 1
+
+    if [ -n "$integrity" ] && command -v python3 &>/dev/null; then
+        expected=${integrity#sha512-}
+        actual=$(python3 -c "import hashlib,base64,sys; print(base64.b64encode(hashlib.sha512(open(sys.argv[1],'rb').read()).digest()).decode())" "$archive" 2>/dev/null) || actual=""
+        if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            return 1
+        fi
+    fi
+
     mkdir -p "$TMP_DIR/npmbin"
     tar -xzf "$archive" -C "$TMP_DIR/npmbin"
     verify_binary "$TMP_DIR/npmbin/package/claude"
@@ -434,7 +480,10 @@ setup_glibc_override() {
             count=$((count + 1))
         fi
     done
-    ln -sfn "$GLIBC_PREFIX/lib/ld-linux-aarch64.so.1" "$ovr/ld-linux-aarch64.so.1" 2>/dev/null || true
+    if [ ! -e "$GLIBC_PREFIX/lib/ld-linux-aarch64.so.1" ]; then
+        print_error "No se encontró el cargador glibc ($GLIBC_PREFIX/lib/ld-linux-aarch64.so.1). Reinstala la capa glibc."
+    fi
+    ln -sfn "$GLIBC_PREFIX/lib/ld-linux-aarch64.so.1" "$ovr/ld-linux-aarch64.so.1"
     check_item "Symlinks glibc (override)" "ok" "$count enlaces"
 }
 
@@ -465,9 +514,11 @@ PYEOF
                 merged=true
             fi
         fi
-    fi
-
-    if [ "$merged" != "true" ]; then
+        if [ "$merged" != "true" ]; then
+            check_item "Configuracion de claude" "skip" "sin modificar (no hay python3)"
+            return 0
+        fi
+    else
         cat > "$CLAUDE_SETTINGS_FILE" <<'EOF'
 {
   "autoUpdates": false,
@@ -498,12 +549,10 @@ fetch_claude_binary() {
         return 0
     fi
 
-    if [ -f "$CACHE_DIR/claude" ]; then
-        if run_hidden "Instalar desde caché" true; then
-            if install_binary "$CACHE_DIR/claude"; then
-                INSTALL_METHOD="caché local"
-                return 0
-            fi
+    if cache_is_valid; then
+        if install_binary "$CACHE_DIR/claude"; then
+            INSTALL_METHOD="caché local"
+            return 0
         fi
     fi
 
@@ -603,21 +652,17 @@ do_uninstall() {
 
     local removed=false
 
-    if command -v claude &>/dev/null; then
-        if [ -f "$CLAUDE_BIN_DIR/claude" ]; then
-            echo -e "  ${GREEN}✔${RESET} Eliminando launcher: $CLAUDE_BIN_DIR/claude"
-            rm -f "$CLAUDE_BIN_DIR/claude"
-            removed=true
-        fi
-        if [ -d "$CLAUDE_SHARE_DIR" ]; then
-            echo -e "  ${GREEN}✔${RESET} Eliminando binario: $CLAUDE_SHARE_DIR/"
-            rm -rf "$CLAUDE_SHARE_DIR"
-            removed=true
-        fi
-        if [ "$removed" = "false" ]; then
-            echo -e "  ${YELLOW}−${RESET} No se encontro instalacion de Claude Code."
-        fi
-    else
+    if [ -f "$CLAUDE_BIN_DIR/claude" ]; then
+        echo -e "  ${GREEN}✔${RESET} Eliminando launcher: $CLAUDE_BIN_DIR/claude"
+        rm -f "$CLAUDE_BIN_DIR/claude"
+        removed=true
+    fi
+    if [ -d "$CLAUDE_SHARE_DIR" ]; then
+        echo -e "  ${GREEN}✔${RESET} Eliminando binario: $CLAUDE_SHARE_DIR/"
+        rm -rf "$CLAUDE_SHARE_DIR"
+        removed=true
+    fi
+    if [ "$removed" = "false" ]; then
         echo -e "  ${YELLOW}−${RESET} No se encontro instalacion de Claude Code."
     fi
 
