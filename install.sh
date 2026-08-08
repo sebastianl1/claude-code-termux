@@ -383,12 +383,12 @@ install_binary() {
 fetch_binary_from_npm() {
     local meta tarball archive
 
-    meta=$(curl -fsSL --connect-timeout 20 --max-time 60 "https://registry.npmjs.org/${NPM_SCOPE}/${NPM_PKG}/latest") || return 1
+    meta=$(curl -fsSL --proto =https --connect-timeout 20 --max-time 60 "https://registry.npmjs.org/${NPM_SCOPE}/${NPM_PKG}/latest") || return 1
     tarball=$(printf '%s' "$meta" | grep -o '"tarball":"[^"]*"' | cut -d'"' -f4) || return 1
     [ -n "$tarball" ] || return 1
 
     archive="$TMP_DIR/claude-code-linux-arm64.tgz"
-    curl -fsSL --retry 2 --connect-timeout 20 --max-time 1200 -o "$archive" "$tarball" || return 1
+    curl -fsSL --proto =https --retry 2 --connect-timeout 20 --max-time 1200 -o "$archive" "$tarball" || return 1
     mkdir -p "$TMP_DIR/npmbin"
     tar -xzf "$archive" -C "$TMP_DIR/npmbin"
     verify_binary "$TMP_DIR/npmbin/package/claude"
@@ -398,7 +398,7 @@ fetch_binary_from_url() {
     local url="$1"
     local archive="$TMP_DIR/claude-code-linux-arm64.tar.gz"
 
-    curl -fsSL --retry 2 --connect-timeout 20 --max-time 1200 -o "$archive" "$url" || return 1
+    curl -fsSL --proto =https --retry 2 --connect-timeout 20 --max-time 1200 -o "$archive" "$url" || return 1
     mkdir -p "$TMP_DIR/bin"
     tar -xzf "$archive" -C "$TMP_DIR/bin"
     verify_binary "$TMP_DIR/bin/claude"

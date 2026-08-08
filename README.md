@@ -258,6 +258,10 @@ rm -rf ~/backups/claude.backup.*
 claude-code-termux/
 ├── imagenes/
 │   └── ClaudeCode.jpg     # Banner del proyecto
+├── docs/                   # Landing page (GitHub Pages) con i18n
+│   ├── index.html          # Landing multilingüe (ES, EN, PT, FR, DE, ZH)
+│   ├── lang/               # Diccionarios por idioma
+│   └── robots.txt, sitemap.xml
 ├── scripts/
 │   └── mirror.sh          # Sincroniza el mirror de binarios (copia de seguridad)
 ├── versions.json          # Manifest de versiones + SHA256
@@ -272,6 +276,15 @@ claude-code-termux/
 ## Autor
 
 **Sebastian Laguna** — Creador y mantenedor del proyecto
+
+---
+
+## Comunidad
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Guia para contribuir
+- [SECURITY.md](SECURITY.md) — Politica de seguridad
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Codigo de conducta
+- [CHANGELOG.md](CHANGELOG.md) — Historial de versiones
 
 ---
 
